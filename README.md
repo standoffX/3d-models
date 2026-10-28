@@ -2,6 +2,10 @@
 
 Independent menu/UI prototype stored in **standoffX/3d-models**. It does not change the separate StandoffX game repository.
 
+## Open as a website / on a phone
+
+To publish this prototype through GitHub Pages, open the repository **Settings → Pages**, select **Deploy from a branch**, choose branch `main` and folder `/(root)`, then save. When GitHub Pages reports that the site is published, open `https://standoffx.github.io/3d-models/` on the PC or phone. The Pages site must be enabled first; adding `index.html` to the repository does not enable hosting by itself.
+
 ## Run in a browser
 
 Open `index.html` in a modern browser. The full 3D animation loader works best when the page is served over HTTP/HTTPS, because it imports Three.js from a CDN and loads FBX files from this public repository. If WebGL, the network, or an animation file is unavailable, an SVG agent placeholder stays visible.
