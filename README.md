@@ -1,16 +1,16 @@
 # StandoffX Menu Prototype
 
-Independent menu/UI prototype stored in **standoffX/3d-models**. It does not change the separate StandoffX game repository.
+Independent menu prototype in **standoffX/3d-models**. It does not modify the separate StandoffX game repository.
 
-## Open as a website / on a phone
+## Preview on desktop or phone
 
-To publish this prototype through GitHub Pages, open the repository **Settings → Pages**, select **Deploy from a branch**, choose branch `main` and folder `/(root)`, then save. When GitHub Pages reports that the site is published, open `https://standoffx.github.io/3d-models/` on the PC or phone. The Pages site must be enabled first; adding `index.html` to the repository does not enable hosting by itself.
+To publish this prototype using GitHub Pages, open the repository **Settings → Pages**, select **Deploy from a branch**, choose branch `main` and folder `/(root)`, then save. After GitHub Pages reports that the site is published, open `https://standoffx.github.io/3d-models/` on desktop or phone. Pages must be enabled first.
 
-## Run in a browser
+## Run locally
 
-Open `index.html` in a modern browser. The full 3D animation loader works best when the page is served over HTTP/HTTPS, because it imports Three.js from a CDN and loads FBX files from this public repository. If WebGL, the network, or an animation file is unavailable, an SVG agent placeholder stays visible.
+Open `index.html` in a modern browser. For the 3D FBX loader, it is better to serve the project over HTTP/HTTPS because Three.js and model files are loaded online.
 
-For a local server with Python installed, run this from the repository folder:
+With Python installed, run:
 
 ```bat
 py -m http.server 8000
@@ -20,23 +20,25 @@ Then open http://localhost:8000.
 
 ## Build a Windows EXE
 
-1. Install **Node.js 24 LTS** from https://nodejs.org/ and reopen the terminal.
+1. Install Node.js from https://nodejs.org/ and reopen the terminal.
 2. Download or clone this repository.
 3. Double-click `build-exe.bat`.
-4. The script installs Electron build dependencies and runs the Windows NSIS build.
-5. Find the installer inside `release/`.
+4. The script installs Electron build dependencies and runs the Windows installer build.
+5. Find the installer in `release/`.
 
-The build needs internet access on first run to download npm packages. The menu's 3D models and font are also loaded online; an offline asset bundle can be added later.
+The first build needs internet access for npm packages. Three.js, FBX animations, and other remote assets also require internet access when the app runs.
 
-## Prototype behaviour
+## Menu behaviour
 
-- Responsive desktop and phone layouts, including bottom mobile navigation.
-- Demo modes: КБ, Союзники, Тренировка.
-- Demo lobby, friend invitations, and a simulated invitation acceptance.
-- Local avatar upload/compression, theme, language, sensitivity, animation, and low-performance settings.
-- Demo records are in `DEMO_DATA` in `index.html`. Settings and profile edits remain in the current browser/app storage.
-- Real authentication, real invitations, shared settings, and match start require a backend/API and Socket.IO integration.
+- Standoff-style composition: persistent friends list on the left, animated squad in the center, account and activity panels on the right.
+- No modal overlays: mode selection, lobby, settings, and profile render inside the main interface.
+- The `Excited.fbx` animation loops for the local agent. When a demo friend accepts an invite, their FBX agent is loaded next to the local player and its animation loops independently.
+- If an FBX has no visible rigged mesh/animation or WebGL is unavailable, the menu shows an animated visual fallback for each person.
+- Responsive desktop and phone layout. On phones, the friends list becomes a horizontal strip above the scene.
+- Avatar upload and compression, theme, language, sensitivity, animation, and low-performance settings save locally.
+- Friend acceptance is simulated in the prototype. Replace this timer with the real invite/lobby event from a future API or Socket.IO server.
+- Demo records are in `DEMO_DATA` near the top of `index.html`.
 
-## Models
+## Models used
 
-The page attempts to load `Excited.fbx`, `Talking On Phone.fbx`, and `Illegal Elbow Punch.fbx` from this repository. Whether each FBX includes a visible rigged mesh depends on how it was exported; the placeholder is kept as a fallback.
+The menu loads `Excited.fbx`, `Talking On Phone.fbx`, and `Illegal Elbow Punch.fbx` from this repository. Their animations are repeated continuously while the agents are visible.
