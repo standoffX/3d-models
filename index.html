@@ -135,8 +135,12 @@ paintUser();renderFriends();updateDock();updateStageText();renderRightPanel();pe
 <script type="module">
 import * as THREE from "three";
 import {FBXLoader} from "three/addons/loaders/FBXLoader.js";
+import {TGALoader} from "three/addons/loaders/TGALoader.js";
 const canvas=document.getElementById("agentCanvas"),stage=document.getElementById("stage");
-const state=window.STANDOFFX_MENU.state,user=window.STANDOFFX_MENU.user,loader=new FBXLoader(),clock=new THREE.Clock(),actors=new Map();
+const state=window.STANDOFFX_MENU.state,user=window.STANDOFFX_MENU.user;
+const textureManager=new THREE.LoadingManager();
+textureManager.addHandler(/\\.tga$/i,new TGALoader(textureManager));
+const loader=new FBXLoader(textureManager),clock=new THREE.Clock(),actors=new Map();
 const modelBase="https://raw.githubusercontent.com/standoffX/3d-models/main/";
 let renderer=null,scene=null,camera=null,drag=null,rotation=0;
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
