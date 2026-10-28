@@ -1,47 +1,46 @@
 # StandoffX Menu Prototype
 
-Independent Standoff 2-style lobby/menu prototype in **standoffX/3d-models**. It does not modify the separate StandoffX game repository.
-
-## Preview on desktop or phone
-
-To publish this prototype through GitHub Pages, open the repository **Settings → Pages**, select **Deploy from a branch**, choose branch \`main\` and folder \`/(root)\`, then save. After GitHub Pages reports that the site is published, open \`https://standoffx.github.io/3d-models/\` on desktop or phone. Pages must be enabled first.
+Independent browser prototype in **standoffX/3d-models**. The private `standoffX/StandoffX` game repository is used only as a read-only reference and is not modified by this project.
 
 ## Run locally
 
-Open \`index.html\` in a modern browser. For 3D loading, serve the project over HTTP/HTTPS because Three.js and the FBX/TGA assets are loaded online.
+The page imports Three.js modules and loads FBX/TGA assets over HTTP, so do not open `index.html` directly using `file://`.
 
-With Python installed, run:
+On Windows, open a terminal in this repository and run:
 
-\`\`\`bat
+```bat
 py -m http.server 8000
-\`\`\`
+```
 
-Then open http://localhost:8000.
+Then open **http://localhost:8000** in a modern browser. The browser needs internet access for Three.js and the repository's remote models/textures.
 
-## Build a Windows EXE
+To publish it, open **Settings → Pages**, choose **Deploy from a branch**, select `main` and `/(root)`, and save. Open the Pages URL after GitHub confirms publication.
 
-1. Install Node.js from https://nodejs.org/ and reopen the terminal.
-2. Download or clone this repository.
-3. Double-click \`build-exe.bat\`.
-4. The script installs Electron build dependencies and builds the Windows installer.
-5. Find the installer in \`release/\`.
+## Current prototype features
 
-The first build needs internet access for npm packages. Three.js and the remote 3D assets also require internet access when the app runs.
+- Left sidebar contains Home, Inventory, Market, Clans, Events, and Modes; friends are not shown in this version.
+- Profile/avatar and ID are on the left on desktop. Currency and general Settings stay in the header.
+- The **Agent** button beside currency opens T/CT selection and the three uploaded animation options.
+- The Market and Inventory use local demo data. Purchases, selected weapon, theme, and agent choices are saved in this browser's `localStorage`; this is not a server-backed economy.
+- **Tester Mode** opens a small local 3D shooting range with WASD movement, mouse look, jump, a crosshair, reload, weapon switching, bot targets, and mobile touch controls.
+- The tester bots use the uploaded FBX character animation files. Weapon models are loaded from the `Pistols`, `Rifles`, and `Gloves` folders. AKR uses `Rifles/AKR_JadeStone_D.png`; other weapons receive a procedural surface texture for the prototype.
+- T uses `OTCChA_D.tga`. The code is ready to use `FSB_A_D.tga` for CT, but that file is currently missing from the repository root. Upload it there to enable the CT texture. The CT model is not covered with the T atlas.
+- **Team Fight** and **Allies** are visible in the mode selector but are not implemented as playable multiplayer modes in this release. The tester range is local-only, with simple bot behaviour; it does not connect to a server and the client-side tester label is not secure authentication.
 
-## Menu behaviour
+## Current character animation files
 
-- Main composition inspired by the Standoff 2 lobby: account/currency in the header, friends list on the left, animated team in the center, event/pass cards on the right, and mode selection plus a green Play button in the bottom-right corner.
-- No modal dialogs: mode selection, team lobby, profile, and settings appear in the right-side panel while the main lobby remains visible.
-- The local \`Excited.fbx\` character animation loops. Inviting a demo friend simulates acceptance; that player's animated FBX character appears alongside the local agent.
-- The FBX loader also registers the repository's \`OTCChA_D.tga\` texture format. If WebGL or an animated model is unavailable, an animated fallback character remains visible.
-- Responsive desktop/phone layout. On phones, the friends list becomes a horizontal strip above the character scene.
-- Avatar upload/compression, themes, language choice, sensitivity, animation toggle, and low-performance setting are stored locally.
-- Friend acceptance is simulated in the prototype. Real invitations and shared lobby state require an API/Socket.IO server.
-- Demo data lives in \`DEMO_DATA\` in \`index.html\`.
+- T: `Excited.fbx`, `Illegal Elbow Punch.fbx`, `Talking On Phone.fbx`
+- CT: `Excited_CT.fbx`, `Illegal Elbow Punch_CT.fbx`, `Talking On Phone _CT.fbx`
 
-## Models used
+## Controls in Tester Mode
 
-- \`Excited.fbx\` — local player's idle/selected animation
-- \`Talking On Phone.fbx\` — demo friend animation
-- \`Illegal Elbow Punch.fbx\` — another demo friend animation
-- \`OTCChA_D.tga\` — character texture loaded through \`TGALoader\`
+- **WASD / arrow keys** — move
+- **Mouse** — look around; click the scene to lock the cursor
+- **Left mouse button** — fire
+- **R** — reload
+- **1 / 2** — AKR / USP
+- **Space** — jump
+- **Esc** — release the mouse cursor
+- On touch screens, use the directional pad, Fire and Reload controls; drag on the scene to look around.
+
+All game state is local and is reset when you start a new tester run. This is an early prototype; full Teams/Allies match flow and server-backed testing permissions remain future work.
