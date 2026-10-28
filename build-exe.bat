@@ -38,5 +38,5 @@ if errorlevel 1 (
 
 echo.
 echo [SUCCESS] Installer is in the release folder.
-echo release\StandoffX Menu Setup.exe
+echo release\StandoffX Menu-Setup.exe
 pause
