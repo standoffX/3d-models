@@ -13,6 +13,9 @@
 @media(max-width:420px){.brand-name{letter-spacing:.6px}.season{letter-spacing:1px}.topbar{gap:7px;padding-left:9px;padding-right:9px}.resource{gap:4px;padding:7px}.main{padding-left:11px;padding-right:11px}.heading{font-size:23px}.hero{height:360px}.sidecol{grid-template-columns:1fr}.profile-card,.activity-card{grid-column:auto}.team-card{grid-column:auto}.squad-slots{gap:6px}.slot .avatar{width:31px;height:31px}.bottom-play .btn{min-width:86px;padding:12px 9px}.mode-map{max-width:130px;line-height:1.3}.online-pill{gap:5px}.online-pill .dot{width:6px;height:6px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
 </style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
 </head>
 <body>
 <div class="app" id="appRoot">
@@ -135,8 +138,8 @@ bindModals();paintUser();renderModeGrid();applyModeRules();updateSelectedMode();
 /* Optional 3D animation files in this repository; the lightweight SVG remains as fallback. */
 </script>
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import {FBXLoader} from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/FBXLoader.js';
+import * as THREE from 'three';
+import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
 const canvas=document.getElementById('heroCanvas');let renderer=null,scene=null,camera=null,activeModel=null,activeMixer=null,clock=new THREE.Clock();const loader=new FBXLoader();const rootUrl='https://raw.githubusercontent.com/standoffX/3d-models/main/';let dragStart=null,rotation=0,dragEnabled=true;
 function initScene(){try{renderer=new THREE.WebGLRenderer({canvas:canvas,alpha:true,antialias:false,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,localStorage.getItem('sx-low-effects')==='true'?.65:1.2));renderer.setSize(canvas.clientWidth||640,canvas.clientHeight||500,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(32,1,.1,100);camera.position.set(0,2.2,8.5);camera.lookAt(0,1.55,0);scene.add(new THREE.HemisphereLight(0xdaf7ff,0x27303a,2.1));const key=new THREE.DirectionalLight(0xeaf7ff,2.7);key.position.set(3,6,5);scene.add(key);const rim=new THREE.DirectionalLight(0x3acddf,2.3);rim.position.set(-4,3,-3);scene.add(rim);const floor=new THREE.Mesh(new THREE.CircleGeometry(2.1,48),new THREE.MeshBasicMaterial({color:0x09131b,transparent:true,opacity:.55}));floor.rotation.x=-Math.PI/2;floor.position.y=.015;scene.add(floor);resize();window.addEventListener('resize',resize);animate();return true}catch(e){status3d('SVG · РЕЗЕРВНЫЙ АГЕНТ');return false}}
 function resize(){if(!renderer||!camera)return;const w=canvas.clientWidth||640,h=canvas.clientHeight||500;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
