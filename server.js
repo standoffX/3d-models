@@ -302,7 +302,7 @@ app.post("/api/match/start",requireDatabase,auth,async(req,res,next)=>{try{
  res.status(201).json({match:matchSnapshot(match)});
 }catch(e){next(e)}});
 app.get("/api/match/current",requireDatabase,auth,(req,res)=>{const m=Array.from(activeMatches.values()).find(x=>x.players[String(req.user._id)]);res.json({match:m?matchSnapshot(m):null})});
-app.post("/api/match/leave",auth,(req,res)=>{const id=String(req.body.matchId||"");const m=activeMatches.get(id);if(m&&m.players[String(req.user._id)]){m.players[String(req.user._id)].online=false;m.players[String(req.user._id)].keys={};m.lastActivity=Date.now();io.to("match:"+id).emit("match:player-left",{playerId:req.user.playerId});}res.json({ok:true})});
+app.post("/api/match/leave",auth,(req,res)=>{const id=String(req.body.matchId||"");const m=activeMatches.get(id);if(m&&m.players[String(req.user._id)]){delete m.players[String(req.user._id)];m.lastActivity=Date.now();io.to("match:"+id).emit("match:player-left",{playerId:req.user.playerId});if(matchPlayerCount(m)===0)activeMatches.delete(id);}res.json({ok:true})});
 
 io.use(async(socket,next)=>{const token=socket.handshake.auth&&socket.handshake.auth.token;if(!token)return next(new Error("AUTH_REQUIRED"));try{const p=jwt.verify(token,JWT_SECRET),u=await User.findById(p.sub);if(!u)return next(new Error("AUTH_REQUIRED"));socket.data.user=u;next()}catch{next(new Error("AUTH_REQUIRED"))}});
 io.on("connection",async socket=>{
@@ -311,7 +311,7 @@ io.on("connection",async socket=>{
  const lobby=await Lobby.findOne({members:u._id});if(lobby)socket.join("lobby:"+String(lobby._id));
  socket.emit("server:ready",{playerId:u.playerId,nickname:u.nickname});
  socket.broadcast.emit("presence:update",{playerId:u.playerId,online:true});
- const existingMatch=Array.from(activeMatches.values()).find(m=>m.players[uid]);
+ const existingMatch=Array.from(activeMatches.values()).find(m=>m.players[uid]&&!m.players[uid].left);
  if(existingMatch){existingMatch.players[uid].online=true;socket.join("match:"+existingMatch.id);socket.emit("match:launch",matchSnapshot(existingMatch));sendMatchState(existingMatch)}
  socket.on("lobby:join",async lobbyId=>{try{const l=await Lobby.findById(String(lobbyId||""));if(l&&l.members.some(id=>String(id)===uid))socket.join("lobby:"+String(l._id))}catch{}});
  socket.on("match:join",data=>{
@@ -360,7 +360,7 @@ io.on("connection",async socket=>{
   }
   socket.emit("match:shot-result",result);m.lastActivity=now;sendMatchState(m);
  });
- socket.on("match:leave",data=>{const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];if(p){p.online=false;p.keys={};m.lastActivity=Date.now();socket.leave("match:"+id);io.to("match:"+id).emit("match:player-left",{playerId:u.playerId})}});
+ socket.on("match:leave",data=>{const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];if(p){delete m.players[uid];m.lastActivity=Date.now();socket.leave("match:"+id);io.to("match:"+id).emit("match:player-left",{playerId:u.playerId});if(matchPlayerCount(m)===0)activeMatches.delete(id)}});
  socket.on("match:reload",data=>{
   const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];
   if(!p||p.hp<=0||p.ammo>=p.maxAmmo||p.reloadAt>Date.now())return;
