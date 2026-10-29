@@ -1,5 +1,5 @@
 "use strict";
-require("dotenv").config();
+require("dotenv").config({ path: require("node:path").join(__dirname, ".env") });
 const path=require("node:path"),http=require("node:http"),crypto=require("node:crypto");
 const express=require("express"),mongoose=require("mongoose"),bcrypt=require("bcryptjs"),jwt=require("jsonwebtoken");
 const {Server}=require("socket.io");
@@ -115,9 +115,9 @@ app.delete("/api/friends/:playerId",requireDatabase,auth,async(req,res)=>{const 
 app.get("/api/lobby/me",requireDatabase,auth,async(req,res)=>{const l=await Lobby.findOne({members:req.user._id});res.json({lobby:l?lobbyPayload(await loadLobby(l._id)):null})});
 app.post("/api/lobby/create",requireDatabase,auth,async(req,res,next)=>{try{
  const existing=await Lobby.findOne({members:req.user._id});if(existing)return res.json({lobby:lobbyPayload(await loadLobby(existing._id))});
- const mode=MODES.has(req.body.mode)?req.body.mode:"team_fight",map=MAPS.has(req.body.map)?req.body.map:"Sandstone";
+ let mode=MODES.has(req.body.mode)?req.body.mode:"team_fight";const map=MAPS.has(req.body.map)?req.body.map:"Sandstone";if(mode==="training"&&!["tester","admin"].includes(req.user.role))mode="team_fight";
  const l=await Lobby.create({leader:req.user._id,members:[req.user._id],mode,map}),payload=lobbyPayload(await loadLobby(l._id));
- io.to("user:"+String(req.user._id)).emit("lobby:update",payload);res.status(201).json({lobby:payload});
+ io.to("user:"+String(req.user._id)).emit("lobby:update",payload);io.sockets.sockets.forEach(sock=>{if(sock.data.user&&String(sock.data.user._id)===String(req.user._id))sock.join("lobby:"+String(l._id))});res.status(201).json({lobby:payload});
 }catch(e){next(e)}});
 app.post("/api/lobby/:id/invite",requireDatabase,auth,async(req,res,next)=>{try{
  const l=await Lobby.findById(req.params.id);if(!l)return apiError(res,404,"Лобби не найдено.");if(String(l.leader)!==String(req.user._id))return apiError(res,403,"Приглашать может только лидер.");
@@ -139,7 +139,7 @@ app.post("/api/lobby/:id/leave",requireDatabase,auth,async(req,res,next)=>{try{
 }catch(e){next(e)}});
 app.patch("/api/lobby/:id/settings",requireDatabase,auth,async(req,res,next)=>{try{
  const l=await Lobby.findById(req.params.id);if(!l)return apiError(res,404,"Лобби не найдено.");if(String(l.leader)!==String(req.user._id))return apiError(res,403,"Только лидер лобби может менять режим, карту и состав.");
- if(req.body.mode!==undefined){if(!MODES.has(req.body.mode))return apiError(res,400,"Неизвестный режим.");l.mode=req.body.mode}
+ if(req.body.mode!==undefined){if(!MODES.has(req.body.mode))return apiError(res,400,"Неизвестный режим.");if(req.body.mode==="training"&&!["tester","admin"].includes(req.user.role))return apiError(res,403,"Режим тестера доступен только тестерам.");l.mode=req.body.mode}
  if(req.body.map!==undefined){if(!MAPS.has(req.body.map))return apiError(res,400,"Неизвестная карта.");l.map=req.body.map}
  if(req.body.enemyType!==undefined){if(!["players","bots"].includes(req.body.enemyType))return apiError(res,400,"Неверный состав.");if(l.mode==="training"&&req.body.enemyType==="bots"&&!["tester","admin"].includes(req.user.role))return apiError(res,403,"Боты разрешены только тестировщикам.");l.enemyType=req.body.enemyType}
  l.updatedAt=new Date();await l.save();await broadcastLobby(l._id);res.json({lobby:lobbyPayload(await loadLobby(l._id))});
@@ -202,6 +202,7 @@ app.delete("/api/admin/clans/:id",requireDatabase,auth,adminOnly,async(req,res)=
 
 io.use(async(socket,next)=>{const token=socket.handshake.auth&&socket.handshake.auth.token;if(!token)return next(new Error("AUTH_REQUIRED"));try{const p=jwt.verify(token,JWT_SECRET),u=await User.findById(p.sub);if(!u)return next(new Error("AUTH_REQUIRED"));socket.data.user=u;next()}catch{next(new Error("AUTH_REQUIRED"))}});
 io.on("connection",async socket=>{const u=socket.data.user;socket.join("user:"+String(u._id));const l=await Lobby.findOne({members:u._id});if(l)socket.join("lobby:"+String(l._id));socket.emit("server:ready",{playerId:u.playerId,nickname:u.nickname});
+ socket.on("lobby:join",async lobbyId=>{try{const l=await Lobby.findById(String(lobbyId||""));if(l&&l.members.some(id=>String(id)===String(u._id)))socket.join("lobby:"+String(l._id))}catch{}});
  socket.on("lobby:chat",async data=>{try{const id=String(data&&data.lobbyId||""),text=String(data&&data.text||"").trim().slice(0,MAX_CHAT_LENGTH);if(!text||!mongoose.isValidObjectId(id))return;const l=await Lobby.findById(id);if(!l||!l.members.some(x=>String(x)===String(u._id)))return;const msg=await ChatMessage.create({kind:"lobby",from:u._id,lobbyId:l._id,text});io.to("lobby:"+id).emit("lobby:chat:new",{id:String(msg._id),text,from:{playerId:u.playerId,nickname:u.nickname},createdAt:msg.createdAt})}catch(e){console.error("[socket lobby:chat]",e.message)}});
  socket.on("disconnect",()=>{u.lastSeenAt=new Date();u.save().catch(()=>{});socket.broadcast.emit("presence:update",{playerId:u.playerId,online:false})});
 });
