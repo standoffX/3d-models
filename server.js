@@ -226,7 +226,7 @@ function addMatchPlayer(match,user) {
  const weapon=["USP","P350","AKR","M4"].includes(user.selectedWeapon)?user.selectedWeapon:"USP";
  const maxAmmo=(weapon==="USP"||weapon==="P350")?12:30;
  const p={userId:id,playerId:user.playerId,nickname:user.nickname,side:user.selectedSide||spawn.side,animation:user.selectedAnimation||"Excited",weapon,
-  x:spawn.x,z:spawn.z,yaw:Math.PI,pitch:0,hp:100,ammo:maxAmmo,maxAmmo,kills:0,online:true,keys:{},lastShotAt:0,reloadAt:0,respawnAt:0,lastInputAt:Date.now()};
+  x:spawn.x,z:spawn.z,yaw:0,pitch:0,hp:100,ammo:maxAmmo,maxAmmo,kills:0,online:true,keys:{},lastShotAt:0,reloadAt:0,respawnAt:0,lastInputAt:Date.now()};
  match.players[id]=p;
  return p;
 }
@@ -359,6 +359,7 @@ io.on("connection",async socket=>{
   }
   socket.emit("match:shot-result",result);m.lastActivity=now;sendMatchState(m);
  });
+ socket.on("match:leave",data=>{const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];if(p){p.online=false;p.keys={};m.lastActivity=Date.now();socket.leave("match:"+id);io.to("match:"+id).emit("match:player-left",{playerId:u.playerId})}});
  socket.on("match:reload",data=>{
   const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];
   if(!p||p.hp<=0||p.ammo>=p.maxAmmo||p.reloadAt>Date.now())return;
