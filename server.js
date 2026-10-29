@@ -200,6 +200,109 @@ app.get("/api/admin/clans",requireDatabase,auth,adminOnly,async(req,res)=>{const
 app.patch("/api/admin/clans/:id",requireDatabase,auth,adminOnly,async(req,res,next)=>{try{const c=await Clan.findById(req.params.id);if(!c)return apiError(res,404,"Клан не найден.");if(req.body.name!==undefined)c.name=String(req.body.name).trim().slice(0,32);if(req.body.tag!==undefined)c.tag=String(req.body.tag).trim().toUpperCase().slice(0,6);await c.save();res.json({ok:true})}catch(e){if(e&&e.code===11000)return apiError(res,409,"Тег уже используется.");next(e)}});
 app.delete("/api/admin/clans/:id",requireDatabase,auth,adminOnly,async(req,res)=>{const c=await Clan.findById(req.params.id);if(!c)return apiError(res,404,"Клан не найден.");await User.updateMany({clanId:c._id},{$set:{clanId:null}});await Clan.deleteOne({_id:c._id});res.json({ok:true})});
 
+
+const activeMatches = new Map();
+let matchTickTimer = null;
+const MATCH_STEP = 0.05;
+const MATCH_SPAWNS = [[-5, 8], [5, 8], [-5, 13], [5, 13]];
+function matchPlayerCount(match) { return Object.keys(match.players).length; }
+function cleanMatchPlayer(p) {
+ return { id:p.playerId, playerId:p.playerId, nickname:p.nickname, side:p.side, animation:p.animation, weapon:p.weapon, x:p.x, z:p.z, yaw:p.yaw, pitch:p.pitch, hp:p.hp, ammo:p.ammo, maxAmmo:p.maxAmmo, kills:p.kills, online:p.online, isBot:false };
+}
+function matchSnapshot(match) {
+ return { id:match.id, mode:match.mode, map:match.map, status:match.status, createdAt:match.createdAt,
+  players:Object.values(match.players).map(cleanMatchPlayer),
+  bots:match.bots.map(b=>({id:b.id,playerId:b.id,nickname:b.nickname,side:b.side,animation:b.animation,weapon:"AKR",x:b.x,z:b.z,yaw:b.yaw,pitch:0,hp:b.hp,ammo:30,maxAmmo:30,kills:b.kills,online:true,isBot:true,alive:b.alive})) };
+}
+function sendMatchState(match) { io.to("match:"+match.id).emit("match:state",matchSnapshot(match)); }
+function playerSpawn(index, side) {
+ const p=MATCH_SPAWNS[index%MATCH_SPAWNS.length];
+ return {x:p[0],z:p[1],side:side||((index%2===0)?"T":"CT")};
+}
+function addMatchPlayer(match,user) {
+ const id=String(user._id);
+ if(match.players[id]) { match.players[id].online=true; return match.players[id]; }
+ const index=matchPlayerCount(match),spawn=playerSpawn(index,index%2===0?"T":"CT");
+ const weapon=["USP","P350","AKR","M4"].includes(user.selectedWeapon)?user.selectedWeapon:"USP";
+ const maxAmmo=(weapon==="USP"||weapon==="P350")?12:30;
+ const p={userId:id,playerId:user.playerId,nickname:user.nickname,side:user.selectedSide||spawn.side,animation:user.selectedAnimation||"Excited",weapon,
+  x:spawn.x,z:spawn.z,yaw:Math.PI,pitch:0,hp:100,ammo:maxAmmo,maxAmmo,kills:0,online:true,keys:{},lastShotAt:0,reloadAt:0,respawnAt:0,lastInputAt:Date.now()};
+ match.players[id]=p;
+ return p;
+}
+function makeBots(match,count) {
+ match.bots=[];
+ const points=[[-7,-9],[5,-11],[-1,-15]];
+ const human=Object.values(match.players)[0];
+ const botSide=human&&human.side==="T"?"CT":"T";
+ for(let i=0;i<count;i++){const p=points[i%points.length];match.bots.push({id:"bot-"+(i+1),nickname:"BOT "+String(i+1).padStart(2,"0"),side:botSide,animation:"Excited",x:p[0],z:p[1],yaw:0,hp:100,kills:0,shootAt:Date.now()+1500+Math.random()*1500,goalX:(Math.random()-.5)*15,goalZ:-5-Math.random()*10,respawnAt:0,alive:true});}
+}
+async function addUserSocketsToMatch(match,userIds) {
+ const target=new Set(userIds.map(String));
+ io.sockets.sockets.forEach(sock=>{
+  if(sock.data.user&&target.has(String(sock.data.user._id))) {
+   sock.join("match:"+match.id);
+   sock.emit("match:launch",matchSnapshot(match));
+  }
+ });
+}
+function nearestEnemy(match,attacker) {
+ let winner=null,best=Infinity;
+ for(const p of Object.values(match.players)){if(p.userId===attacker.userId||p.side===attacker.side||p.hp<=0)continue;const d=Math.hypot(p.x-attacker.x,p.z-attacker.z);if(d<best){best=d;winner=p;}}
+ for(const b of match.bots){if(!b.alive||b.side===attacker.side)continue;const d=Math.hypot(b.x-attacker.x,b.z-attacker.z);if(d<best){best=d;winner=b;}}
+ return winner?{target:winner,distance:best}:null;
+}
+function stepMatch(match,now) {
+ for(const p of Object.values(match.players)){
+  if(!p.online) {p.keys={};continue;}
+  if(p.hp<=0) {if(p.respawnAt&&now>=p.respawnAt){const spawn=playerSpawn(Object.keys(match.players).indexOf(p.userId),p.side);p.x=spawn.x;p.z=spawn.z;p.hp=100;p.ammo=p.maxAmmo;p.respawnAt=0;} else continue;}
+  if(p.reloadAt&&now>=p.reloadAt){p.ammo=p.maxAmmo;p.reloadAt=0;}
+  const keys=p.keys||{},fwd={x:-Math.sin(p.yaw),z:-Math.cos(p.yaw)},right={x:Math.cos(p.yaw),z:-Math.sin(p.yaw)};
+  let dx=0,dz=0;
+  if(keys.forward){dx+=fwd.x;dz+=fwd.z;}if(keys.backward){dx-=fwd.x;dz-=fwd.z;}if(keys.right){dx+=right.x;dz+=right.z;}if(keys.left){dx-=right.x;dz-=right.z;}
+  const length=Math.hypot(dx,dz);
+  if(length>0){const speed=keys.sprint?7.2:4.4;p.x+=dx/length*speed*MATCH_STEP;p.z+=dz/length*speed*MATCH_STEP;}
+  p.x=Math.max(-16,Math.min(16,p.x));p.z=Math.max(-17,Math.min(17,p.z));
+  if(now-p.lastInputAt>5000)p.keys={};
+ }
+ for(const b of match.bots){
+  if(!b.alive){if(now>=b.respawnAt){b.hp=100;b.alive=true;const sp=playerSpawn(match.bots.indexOf(b)+1,b.side);b.x=sp.x;b.z=sp.z;b.shootAt=now+2000;}continue;}
+  const target=Object.values(match.players).filter(p=>p.online&&p.hp>0&&p.side!==b.side).sort((a,c)=>Math.hypot(a.x-b.x,a.z-b.z)-Math.hypot(c.x-b.x,c.z-b.z))[0];
+  if(!target)continue;
+  const dx=target.x-b.x,dz=target.z-b.z,d=Math.hypot(dx,dz)||1;b.yaw=Math.atan2(-dx,-dz);
+  if(d>4){b.x+=dx/d*1.1*MATCH_STEP;b.z+=dz/d*1.1*MATCH_STEP;}
+  if(d<13&&now>=b.shootAt){b.shootAt=now+1700+Math.random()*1800;if(Math.random()<0.32){target.hp=Math.max(0,target.hp-7);if(target.hp===0){target.respawnAt=now+2000;target.keys={};}io.to("user:"+target.userId).emit("match:hit",{from:b.nickname,hp:target.hp});}}
+ }
+ if(matchPlayerCount(match)===0){activeMatches.delete(match.id);return;}
+ sendMatchState(match);
+}
+function startMatchTicker(){if(matchTickTimer)return;matchTickTimer=setInterval(()=>{const now=Date.now();for(const m of activeMatches.values()){if(now-m.lastActivity>300000&&Object.values(m.players).every(p=>!p.online)){activeMatches.delete(m.id);continue;}stepMatch(m,now)}},Math.round(MATCH_STEP*1000));if(matchTickTimer.unref)matchTickTimer.unref();}
+app.post("/api/match/start",requireDatabase,auth,async(req,res,next)=>{try{
+ const lobbyId=String(req.body.lobbyId||"");
+ if(!mongoose.isValidObjectId(lobbyId))return apiError(res,400,"Не выбрано лобби.");
+ const lobby=await Lobby.findById(lobbyId);
+ if(!lobby)return apiError(res,404,"Лобби не найдено.");
+ if(String(lobby.leader)!==String(req.user._id))return apiError(res,403,"Запустить матч может только лидер лобби.");
+ const mode=lobby.mode,map=lobby.map;
+ if(mode==="training"&&!["tester","admin"].includes(req.user.role))return apiError(res,403,"Режим тестера доступен только тестерам.");
+ if(lobby.enemyType==="bots"&&!["tester","admin"].includes(req.user.role))return apiError(res,403,"Боты доступны только тестерам.");
+ for(const m of activeMatches.values()){if(m.players[String(req.user._id)]){await addUserSocketsToMatch(m,Object.keys(m.players));return res.json({match:matchSnapshot(m)})}}
+ const users=await User.find({_id:{$in:lobby.members}});
+ if(!users.some(u=>String(u._id)===String(req.user._id)))users.unshift(req.user);
+ let match=null;
+ if(mode!=="training"&&users.length===1){
+  match=Array.from(activeMatches.values()).find(m=>m.openQueue&&m.status==="active"&&m.mode===mode&&m.map===map&&Date.now()-m.createdAt<120000&&matchPlayerCount(m)<4);
+ }
+ if(!match){match={id:crypto.randomUUID(),mode,map,status:"active",createdAt:Date.now(),lastActivity:Date.now(),openQueue:mode!=="training"&&users.length===1,players:{},bots:[],scores:{T:0,CT:0}};activeMatches.set(match.id,match);}
+ for(const u of users){if(matchPlayerCount(match)>=4)break;addMatchPlayer(match,u);}
+ if(mode==="training"){const count=Math.max(0,Math.min(3,Number(req.body.botCount??2)||0));makeBots(match,count);}
+ match.lastActivity=Date.now();startMatchTicker();
+ await addUserSocketsToMatch(match,Object.keys(match.players));
+ res.status(201).json({match:matchSnapshot(match)});
+}catch(e){next(e)}});
+app.get("/api/match/current",requireDatabase,auth,(req,res)=>{const m=Array.from(activeMatches.values()).find(x=>x.players[String(req.user._id)]);res.json({match:m?matchSnapshot(m):null})});
+app.post("/api/match/leave",auth,(req,res)=>{const id=String(req.body.matchId||"");const m=activeMatches.get(id);if(m&&m.players[String(req.user._id)]){m.players[String(req.user._id)].online=false;m.players[String(req.user._id)].keys={};m.lastActivity=Date.now();io.to("match:"+id).emit("match:player-left",{playerId:req.user.playerId});}res.json({ok:true})});
+
 io.use(async(socket,next)=>{const token=socket.handshake.auth&&socket.handshake.auth.token;if(!token)return next(new Error("AUTH_REQUIRED"));try{const p=jwt.verify(token,JWT_SECRET),u=await User.findById(p.sub);if(!u)return next(new Error("AUTH_REQUIRED"));socket.data.user=u;next()}catch{next(new Error("AUTH_REQUIRED"))}});
 io.on("connection",async socket=>{const u=socket.data.user;socket.join("user:"+String(u._id));const l=await Lobby.findOne({members:u._id});if(l)socket.join("lobby:"+String(l._id));socket.emit("server:ready",{playerId:u.playerId,nickname:u.nickname});socket.broadcast.emit("presence:update",{playerId:u.playerId,online:true});
  socket.on("lobby:join",async lobbyId=>{try{const l=await Lobby.findById(String(lobbyId||""));if(l&&l.members.some(id=>String(id)===String(u._id)))socket.join("lobby:"+String(l._id))}catch{}});
