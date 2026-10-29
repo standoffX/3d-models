@@ -141,7 +141,7 @@ app.patch("/api/lobby/:id/settings",requireDatabase,auth,async(req,res,next)=>{t
  const l=await Lobby.findById(req.params.id);if(!l)return apiError(res,404,"Лобби не найдено.");if(String(l.leader)!==String(req.user._id))return apiError(res,403,"Только лидер лобби может менять режим, карту и состав.");
  if(req.body.mode!==undefined){if(!MODES.has(req.body.mode))return apiError(res,400,"Неизвестный режим.");if(req.body.mode==="training"&&!["tester","admin"].includes(req.user.role))return apiError(res,403,"Режим тестера доступен только тестерам.");l.mode=req.body.mode}
  if(req.body.map!==undefined){if(!MAPS.has(req.body.map))return apiError(res,400,"Неизвестная карта.");l.map=req.body.map}
- if(req.body.enemyType!==undefined){if(!["players","bots"].includes(req.body.enemyType))return apiError(res,400,"Неверный состав.");if(l.mode==="training"&&req.body.enemyType==="bots"&&!["tester","admin"].includes(req.user.role))return apiError(res,403,"Боты разрешены только тестировщикам.");l.enemyType=req.body.enemyType}
+ if(req.body.enemyType!==undefined){if(!["players","bots"].includes(req.body.enemyType))return apiError(res,400,"Неверный состав.");if(req.body.enemyType==="bots"&&!["tester","admin"].includes(req.user.role))return apiError(res,403,"Боты разрешены только тестировщикам.");l.enemyType=req.body.enemyType}
  l.updatedAt=new Date();await l.save();await broadcastLobby(l._id);res.json({lobby:lobbyPayload(await loadLobby(l._id))});
 }catch(e){next(e)}});
 
