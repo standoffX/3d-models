@@ -351,7 +351,7 @@ io.on("connection",async socket=>{
   }
   let result={matchId:id,hit:false,ammo:p.ammo};
   if(best){
-   best.target.hp=Math.max(0,best.target.hp-damage);result={matchId:id,hit:true,target:best.target.nickname||best.id,killed:best.target.hp<=0,ammo:p.ammo,hp:best.target.hp};
+   best.target.hp=Math.max(0,best.target.hp-damage);result={matchId:id,hit:true,target:best.target.nickname||best.id,killed:best.target.hp<=0,ammo:p.ammo,hp:best.target.hp};if(best.kind==="player")io.to("user:"+best.target.userId).emit("match:hit",{from:p.nickname,hp:best.target.hp});
    if(best.target.hp<=0){
     p.kills++;
     if(best.kind==="bot"){best.target.alive=false;best.target.respawnAt=now+1500}
@@ -394,6 +394,6 @@ async function startServer(options={}){
   const actualPort=server.address()&&server.address().port;console.log("[http] Listening on http://127.0.0.1:"+actualPort);return {app,server,io,port:actualPort};
  })();return startPromise;
 }
-async function stopServer(){if(server.listening)await new Promise(resolve=>server.close(resolve));io.close();if(mongoose.connection.readyState)await mongoose.disconnect()}
+async function stopServer(){if(matchTickTimer){clearInterval(matchTickTimer);matchTickTimer=null}activeMatches.clear();if(server.listening)await new Promise(resolve=>server.close(resolve));io.close();if(mongoose.connection.readyState)await mongoose.disconnect()}
 if(require.main===module){startServer().catch(e=>{console.error(e);process.exitCode=1});process.on("SIGINT",()=>stopServer().finally(()=>process.exit(0)));process.on("SIGTERM",()=>stopServer().finally(()=>process.exit(0)))}
 module.exports={app,server,io,startServer,stopServer,User,Lobby,Clan,ChatMessage};
