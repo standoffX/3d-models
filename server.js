@@ -225,7 +225,7 @@ function addMatchPlayer(match,user) {
  const index=matchPlayerCount(match),spawn=playerSpawn(index,index%2===0?"T":"CT");
  const weapon=["USP","P350","AKR","M4"].includes(user.selectedWeapon)?user.selectedWeapon:"USP";
  const maxAmmo=(weapon==="USP"||weapon==="P350")?12:30;
- const p={userId:id,playerId:user.playerId,nickname:user.nickname,side:user.selectedSide||spawn.side,animation:user.selectedAnimation||"Excited",weapon,
+ const p={userId:id,playerId:user.playerId,nickname:user.nickname,side:match.mode==="training"?(user.selectedSide||spawn.side):spawn.side,animation:user.selectedAnimation||"Excited",weapon,
   x:spawn.x,z:spawn.z,yaw:0,pitch:0,hp:100,ammo:maxAmmo,maxAmmo,kills:0,online:true,keys:{},lastShotAt:0,reloadAt:0,respawnAt:0,lastInputAt:Date.now()};
  match.players[id]=p;
  return p;
@@ -241,6 +241,7 @@ async function addUserSocketsToMatch(match,userIds) {
  const target=new Set(userIds.map(String));
  io.sockets.sockets.forEach(sock=>{
   if(sock.data.user&&target.has(String(sock.data.user._id))) {
+   if(match.players[String(sock.data.user._id)])match.players[String(sock.data.user._id)].online=true;
    sock.join("match:"+match.id);
    sock.emit("match:launch",matchSnapshot(match));
   }
