@@ -156,6 +156,26 @@ app.post("/api/chat/:playerId",requireDatabase,auth,async(req,res,next)=>{try{
  io.to("user:"+String(req.user._id)).emit("chat:new",payload);io.to("user:"+String(other._id)).emit("chat:new",payload);res.status(201).json({message:payload});
 }catch(e){next(e)}});
 
+const MARKET_PRICES={usp:0,akr:1850,m4:2200,p350:650,karambit:2400,gloves:900};
+const MARKET_WEAPONS={usp:"USP",akr:"AKR",m4:"M4",p350:"P350"};
+app.get("/api/market",requireDatabase,auth,async(req,res)=>res.json({gold:req.user.gold,skins:req.user.skins||[],items:[
+ {id:"usp",name:"USP",type:"Пистолет",price:0},{id:"akr",name:"AKR",type:"Винтовка",price:1850},
+ {id:"m4",name:"M4",type:"Винтовка",price:2200},{id:"p350",name:"P350",type:"Пистолет",price:650},
+ {id:"karambit",name:"Karambit",type:"Нож",price:2400},{id:"gloves",name:"Перчатки",type:"Перчатки",price:900}
+]}));
+app.post("/api/market/buy",requireDatabase,auth,async(req,res,next)=>{try{
+ const itemId=String(req.body.itemId||"");if(!Object.prototype.hasOwnProperty.call(MARKET_PRICES,itemId))return apiError(res,400,"Предмет не найден.");
+ const u=await User.findById(req.user._id);if((u.skins||[]).includes(itemId))return apiError(res,409,"Предмет уже в инвентаре.");
+ const price=MARKET_PRICES[itemId];if(u.gold<price)return apiError(res,400,"Не хватает золота.");
+ u.gold-=price;u.skins.addToSet(itemId);if(MARKET_WEAPONS[itemId])u.selectedWeapon=MARKET_WEAPONS[itemId];await u.save();
+ io.to("user:"+String(u._id)).emit("profile:update",safeUser(u));res.json({user:safeUser(u)});
+}catch(e){next(e)}});
+app.post("/api/market/equip",requireDatabase,auth,async(req,res,next)=>{try{
+ const itemId=String(req.body.itemId||"");if(!Object.prototype.hasOwnProperty.call(MARKET_PRICES,itemId))return apiError(res,400,"Предмет не найден.");
+ const u=await User.findById(req.user._id);if(!(u.skins||[]).includes(itemId))return apiError(res,403,"Сначала получи предмет.");
+ if(MARKET_WEAPONS[itemId])u.selectedWeapon=MARKET_WEAPONS[itemId];await u.save();res.json({user:safeUser(u)});
+}catch(e){next(e)}});
+
 app.get("/api/clans",requireDatabase,auth,async(req,res)=>{const rows=await Clan.find().sort({createdAt:-1}).limit(100).populate("leader","playerId nickname").populate("members","playerId nickname");res.json({clans:rows.map(c=>({id:String(c._id),name:c.name,tag:c.tag,leader:c.leader?{playerId:c.leader.playerId,nickname:c.leader.nickname}:null,members:(c.members||[]).map(m=>({playerId:m.playerId,nickname:m.nickname})),createdAt:c.createdAt}))})});
 app.post("/api/clans",requireDatabase,auth,async(req,res,next)=>{try{if(req.user.clanId)return apiError(res,409,"Ты уже состоишь в клане.");
  const name=String(req.body.name||"").trim(),tag=String(req.body.tag||"").trim().toUpperCase();if(name.length<3||name.length>32||!/^[A-Z0-9]{2,6}$/.test(tag))return apiError(res,400,"Название: 3–32 символа, тег: 2–6 латинских букв/цифр.");
