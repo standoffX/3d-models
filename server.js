@@ -135,7 +135,7 @@ app.post("/api/lobby/:id/join",requireDatabase,auth,async(req,res,next)=>{try{
 app.post("/api/lobby/:id/leave",requireDatabase,auth,async(req,res,next)=>{try{
  const l=await Lobby.findById(req.params.id);if(!l)return res.json({ok:true});l.members.pull(req.user._id);l.invited.pull(req.user._id);
  if(!l.members.length)await Lobby.deleteOne({_id:l._id});else{if(String(l.leader)===String(req.user._id))l.leader=l.members[0];l.updatedAt=new Date();await l.save();await broadcastLobby(l._id)}
- io.to("user:"+String(req.user._id)).emit("lobby:update",null);res.json({ok:true});
+ io.sockets.sockets.forEach(sock=>{if(sock.data.user&&String(sock.data.user._id)===String(req.user._id))sock.leave("lobby:"+String(l._id))});io.to("user:"+String(req.user._id)).emit("lobby:update",null);res.json({ok:true});
 }catch(e){next(e)}});
 app.patch("/api/lobby/:id/settings",requireDatabase,auth,async(req,res,next)=>{try{
  const l=await Lobby.findById(req.params.id);if(!l)return apiError(res,404,"Лобби не найдено.");if(String(l.leader)!==String(req.user._id))return apiError(res,403,"Только лидер лобби может менять режим, карту и состав.");
