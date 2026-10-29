@@ -291,12 +291,12 @@ app.post("/api/match/start",requireDatabase,auth,async(req,res,next)=>{try{
  const users=await User.find({_id:{$in:lobby.members}});
  if(!users.some(u=>String(u._id)===String(req.user._id)))users.unshift(req.user);
  let match=null;
- if(mode!=="training"&&users.length===1){
+ if(mode!=="training"&&lobby.enemyType!=="bots"&&users.length===1){
   match=Array.from(activeMatches.values()).find(m=>m.openQueue&&m.status==="active"&&m.mode===mode&&m.map===map&&Date.now()-m.createdAt<120000&&matchPlayerCount(m)<4);
  }
- if(!match){match={id:crypto.randomUUID(),mode,map,status:"active",createdAt:Date.now(),lastActivity:Date.now(),openQueue:mode!=="training"&&users.length===1,players:{},bots:[],scores:{T:0,CT:0}};activeMatches.set(match.id,match);}
+ if(!match){match={id:crypto.randomUUID(),mode,map,status:"active",createdAt:Date.now(),lastActivity:Date.now(),openQueue:mode!=="training"&&lobby.enemyType!=="bots"&&users.length===1,players:{},bots:[],scores:{T:0,CT:0}};activeMatches.set(match.id,match);}
  for(const u of users){if(matchPlayerCount(match)>=4)break;addMatchPlayer(match,u);}
- if(mode==="training"){const count=Math.max(0,Math.min(3,Number(req.body.botCount??2)||0));makeBots(match,count);}
+ if(mode==="training"||lobby.enemyType==="bots"){const count=Math.max(0,Math.min(3,Number(req.body.botCount??2)||0));makeBots(match,count);}
  match.lastActivity=Date.now();startMatchTicker();
  await addUserSocketsToMatch(match,Object.keys(match.players));
  res.status(201).json({match:matchSnapshot(match)});
