@@ -304,10 +304,77 @@ app.get("/api/match/current",requireDatabase,auth,(req,res)=>{const m=Array.from
 app.post("/api/match/leave",auth,(req,res)=>{const id=String(req.body.matchId||"");const m=activeMatches.get(id);if(m&&m.players[String(req.user._id)]){m.players[String(req.user._id)].online=false;m.players[String(req.user._id)].keys={};m.lastActivity=Date.now();io.to("match:"+id).emit("match:player-left",{playerId:req.user.playerId});}res.json({ok:true})});
 
 io.use(async(socket,next)=>{const token=socket.handshake.auth&&socket.handshake.auth.token;if(!token)return next(new Error("AUTH_REQUIRED"));try{const p=jwt.verify(token,JWT_SECRET),u=await User.findById(p.sub);if(!u)return next(new Error("AUTH_REQUIRED"));socket.data.user=u;next()}catch{next(new Error("AUTH_REQUIRED"))}});
-io.on("connection",async socket=>{const u=socket.data.user;socket.join("user:"+String(u._id));const l=await Lobby.findOne({members:u._id});if(l)socket.join("lobby:"+String(l._id));socket.emit("server:ready",{playerId:u.playerId,nickname:u.nickname});socket.broadcast.emit("presence:update",{playerId:u.playerId,online:true});
- socket.on("lobby:join",async lobbyId=>{try{const l=await Lobby.findById(String(lobbyId||""));if(l&&l.members.some(id=>String(id)===String(u._id)))socket.join("lobby:"+String(l._id))}catch{}});
- socket.on("lobby:chat",async data=>{try{const id=String(data&&data.lobbyId||""),text=String(data&&data.text||"").trim().slice(0,MAX_CHAT_LENGTH);if(!text||!mongoose.isValidObjectId(id))return;const l=await Lobby.findById(id);if(!l||!l.members.some(x=>String(x)===String(u._id)))return;const msg=await ChatMessage.create({kind:"lobby",from:u._id,lobbyId:l._id,text});io.to("lobby:"+id).emit("lobby:chat:new",{id:String(msg._id),text,from:{playerId:u.playerId,nickname:u.nickname},createdAt:msg.createdAt})}catch(e){console.error("[socket lobby:chat]",e.message)}});
- socket.on("disconnect",()=>{u.lastSeenAt=new Date();u.save().catch(()=>{});socket.broadcast.emit("presence:update",{playerId:u.playerId,online:false})});
+io.on("connection",async socket=>{
+ const u=socket.data.user,uid=String(u._id);
+ socket.join("user:"+uid);
+ const lobby=await Lobby.findOne({members:u._id});if(lobby)socket.join("lobby:"+String(lobby._id));
+ socket.emit("server:ready",{playerId:u.playerId,nickname:u.nickname});
+ socket.broadcast.emit("presence:update",{playerId:u.playerId,online:true});
+ const existingMatch=Array.from(activeMatches.values()).find(m=>m.players[uid]);
+ if(existingMatch){existingMatch.players[uid].online=true;socket.join("match:"+existingMatch.id);socket.emit("match:launch",matchSnapshot(existingMatch));sendMatchState(existingMatch)}
+ socket.on("lobby:join",async lobbyId=>{try{const l=await Lobby.findById(String(lobbyId||""));if(l&&l.members.some(id=>String(id)===uid))socket.join("lobby:"+String(l._id))}catch{}});
+ socket.on("match:join",data=>{
+  const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];
+  if(!m||!p)return;
+  p.online=true;p.lastInputAt=Date.now();socket.join("match:"+id);
+  socket.emit("match:launch",matchSnapshot(m));sendMatchState(m);
+ });
+ socket.on("match:input",data=>{
+  const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];
+  if(!p||!p.online||p.hp<=0)return;
+  const k=data&&data.keys||{};
+  p.keys={forward:!!k.forward,backward:!!k.backward,left:!!k.left,right:!!k.right,sprint:!!k.sprint};
+  p.yaw=Math.max(-Math.PI*4,Math.min(Math.PI*4,Number(data.yaw)||0));
+  p.pitch=Math.max(-1.3,Math.min(1.3,Number(data.pitch)||0));
+  p.weapon=["USP","P350","AKR","M4"].includes(data.weapon)?data.weapon:p.weapon;
+  const cap=(p.weapon==="USP"||p.weapon==="P350")?12:30;
+  if(p.maxAmmo!==cap){p.maxAmmo=cap;p.ammo=Math.min(p.ammo,cap)}
+  p.lastInputAt=Date.now();m.lastActivity=Date.now();
+ });
+ socket.on("match:fire",data=>{
+  const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid],now=Date.now();
+  if(!m||!p||!p.online||p.hp<=0||p.reloadAt>now||p.ammo<=0)return;
+  const interval=(p.weapon==="USP"||p.weapon==="P350")?280:115;
+  if(now-p.lastShotAt<interval)return;
+  p.lastShotAt=now;p.ammo--;
+  const fx=-Math.sin(p.yaw),fz=-Math.cos(p.yaw),damage=(p.weapon==="AKR"||p.weapon==="M4")?38:34;
+  let best=null,bestProj=Infinity;
+  const candidates=[];
+  for(const other of Object.values(m.players)){if(other.userId===p.userId||other.hp<=0||other.side===p.side)continue;candidates.push({target:other,id:other.userId,kind:"player",radius:.45})}
+  for(const bot of m.bots){if(!bot.alive||bot.hp<=0||bot.side===p.side)continue;candidates.push({target:bot,id:bot.id,kind:"bot",radius:.65})}
+  for(const c of candidates){
+   const dx=c.target.x-p.x,dz=c.target.z-p.z,proj=dx*fx+dz*fz;
+   if(proj<=0||proj>45||proj>=bestProj)continue;
+   const lateral=Math.abs(dx*fz-dz*fx);
+   if(lateral<=c.radius+proj*.026){best={...c,proj};bestProj=proj}
+  }
+  let result={matchId:id,hit:false,ammo:p.ammo};
+  if(best){
+   best.target.hp=Math.max(0,best.target.hp-damage);result={matchId:id,hit:true,target:best.target.nickname||best.id,killed:best.target.hp<=0,ammo:p.ammo,hp:best.target.hp};
+   if(best.target.hp<=0){
+    p.kills++;
+    if(best.kind==="bot"){best.target.alive=false;best.target.respawnAt=now+1500}
+    else {best.target.respawnAt=now+2200;best.target.keys={};}
+   }
+  }
+  socket.emit("match:shot-result",result);m.lastActivity=now;sendMatchState(m);
+ });
+ socket.on("match:reload",data=>{
+  const id=String(data&&data.matchId||""),m=activeMatches.get(id),p=m&&m.players[uid];
+  if(!p||p.hp<=0||p.ammo>=p.maxAmmo||p.reloadAt>Date.now())return;
+  p.reloadAt=Date.now()+650;socket.emit("match:reloading",{duration:650});
+ });
+ socket.on("lobby:chat",async data=>{try{
+  const id=String(data&&data.lobbyId||""),text=String(data&&data.text||"").trim().slice(0,MAX_CHAT_LENGTH);
+  if(!text||!mongoose.isValidObjectId(id))return;
+  const l=await Lobby.findById(id);if(!l||!l.members.some(x=>String(x)===uid))return;
+  const msg=await ChatMessage.create({kind:"lobby",from:u._id,lobbyId:l._id,text});
+  io.to("lobby:"+id).emit("lobby:chat:new",{id:String(msg._id),text,from:{playerId:u.playerId,nickname:u.nickname},createdAt:msg.createdAt});
+ }catch(e){console.error("[socket lobby:chat]",e.message)}});
+ socket.on("disconnect",()=>{
+  u.lastSeenAt=new Date();u.save().catch(()=>{});socket.broadcast.emit("presence:update",{playerId:u.playerId,online:false});
+  for(const m of activeMatches.values()){const p=m.players[uid];if(p){p.online=false;p.keys={};m.lastActivity=Date.now();io.to("match:"+m.id).emit("match:player-left",{playerId:u.playerId})}}
+ });
 });
 
 app.use(express.static(path.join(__dirname),{extensions:["html"]}));
