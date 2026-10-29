@@ -3,10 +3,10 @@ require("dotenv").config({ path: require("node:path").join(__dirname, ".env") })
 const path=require("node:path"),http=require("node:http"),crypto=require("node:crypto");
 const express=require("express"),mongoose=require("mongoose"),bcrypt=require("bcryptjs"),jwt=require("jsonwebtoken");
 const {Server}=require("socket.io");
-const PORT=Number(process.env.PORT||3000),HOST=process.env.HOST||"0.0.0.0";
-const JWT_SECRET=process.env.JWT_SECRET||"change-this-local-prototype-secret-before-deploy";
+const PORT=Number(process.env.PORT||3000),HOST=process.env.HOST||"0.0.0.0",NODE_ENV=process.env.NODE_ENV||"development";
+const JWT_SECRET=process.env.JWT_SECRET||(NODE_ENV==="production"?"":"change-this-local-prototype-secret-before-deploy");
 const MONGODB_URI=process.env.MONGODB_URI||process.env.MONGO_URI||"";
-const ADMIN_NICK=process.env.ADMIN_NICK||"SofterX",ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"SofterX";
+const ADMIN_NICK=process.env.ADMIN_NICK||"SofterX",ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||(NODE_ENV==="production"?"":"SofterX");
 const MODES=new Set(["team_fight","allies","training"]),MAPS=new Set(["Sandstone","Zone 9","Province","Rust"]),MAX_CHAT_LENGTH=1000;
 
 const userSchema=new mongoose.Schema({
@@ -214,6 +214,7 @@ app.use((err,req,res,next)=>{console.error("[http]",err&&err.stack||err);if(res.
 let startPromise=null;
 async function startServer(options={}){
  if(startPromise)return startPromise;const port=options.port===undefined?PORT:Number(options.port);
+ if(NODE_ENV==="production"&&(!MONGODB_URI||!JWT_SECRET||!ADMIN_PASSWORD))throw new Error("Production startup requires MONGODB_URI, JWT_SECRET and ADMIN_PASSWORD environment variables.");
  startPromise=(async()=>{
   if(MONGODB_URI){try{await mongoose.connect(MONGODB_URI,{serverSelectionTimeoutMS:10000,autoIndex:true});console.log("[mongo] Connected: "+mongoose.connection.name);await ensureAdmin()}catch(e){console.error("[mongo] Connection failed:",e.message);console.error("[mongo] HTTP server remains online, but database routes return 503 until MONGODB_URI is fixed.")}}
   else console.warn("[mongo] MONGODB_URI is not configured. Login/register need MongoDB.");
