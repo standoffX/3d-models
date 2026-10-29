@@ -1,46 +1,66 @@
-# StandoffX Menu Prototype
+# StandoffX Menu + Server
 
-Independent browser prototype in **standoffX/3d-models**. The private `standoffX/StandoffX` game repository is used only as a read-only reference and is not modified by this project.
+An independent browser/Electron prototype in `standoffX/3d-models`. The separate `standoffX/StandoffX` game repository is a read-only reference and is not modified by this project.
 
-## Run locally
+## Run the server locally
 
-The page imports Three.js modules and loads FBX/TGA assets over HTTP, so do not open `index.html` directly using `file://`.
+1. Install a current Node.js LTS release.
+2. Download/clone this repository and run `npm install`.
+3. Copy `.env.example` to `.env`.
+4. Set `MONGODB_URI` to your MongoDB Atlas connection string. Keep the real URI/password in `.env` or the hosting provider's secret Environment settings; never commit them.
+5. Set `JWT_SECRET` to a long random secret before deployment. Set a strong `ADMIN_PASSWORD` before the first production startup.
+6. Run:
 
-On Windows, open a terminal in this repository and run:
-
-```bat
-py -m http.server 8000
+```bash
+npm run server
 ```
 
-Then open **http://localhost:8000** in a modern browser. The browser needs internet access for Three.js and the repository's remote models/textures.
+Open **http://localhost:3000**. The health endpoint is **http://localhost:3000/api/health**. It reports whether MongoDB is connected. If MongoDB isn't configured, the HTTP page still opens, but account and database operations return a clear connection error.
 
-To publish it, open **Settings → Pages**, choose **Deploy from a branch**, select `main` and `/(root)`, and save. Open the Pages URL after GitHub confirms publication.
+## Default administrator and accounts
 
-## Current prototype features
+On an empty database, the server creates the admin account:
 
-- Left sidebar contains Home, Inventory, Market, Clans, Events, and Modes; friends are not shown in this version.
-- Profile/avatar and ID are on the left on desktop. Currency and general Settings stay in the header.
-- The **Agent** button beside currency opens T/CT selection and the three uploaded animation options.
-- The Market and Inventory use local demo data. Purchases, selected weapon, theme, and agent choices are saved in this browser's `localStorage`; this is not a server-backed economy.
-- **Tester Mode** opens a small local 3D shooting range with WASD movement, mouse look, jump, a crosshair, reload, weapon switching, bot targets, and mobile touch controls.
-- The tester bots use the uploaded FBX character animation files. Weapon models are loaded from the `Pistols`, `Rifles`, and `Gloves` folders. AKR uses `Rifles/AKR_JadeStone_D.png`; other weapons receive a procedural surface texture for the prototype.
-- T uses `OTCChA_D.tga`. The code is ready to use `FSB_A_D.tga` for CT, but that file is currently missing from the repository root. Upload it there to enable the CT texture. The CT model is not covered with the T atlas.
-- **Team Fight** and **Allies** are visible in the mode selector but are not implemented as playable multiplayer modes in this release. The tester range is local-only, with simple bot behaviour; it does not connect to a server and the client-side tester label is not secure authentication.
+- Nickname: `SofterX`
+- Login ID: `10001` (five digits)
+- Initial password: `SofterX`
 
-## Current character animation files
+The ID may be different if `10001` is already in use. Change the bootstrap password before exposing a production instance and change the password from Settings after logging in. The password is stored as a bcrypt hash, not plaintext.
 
-- T: `Excited.fbx`, `Illegal Elbow Punch.fbx`, `Talking On Phone.fbx`
-- CT: `Excited_CT.fbx`, `Illegal Elbow Punch_CT.fbx`, `Talking On Phone _CT.fbx`
+New players register with a nickname and password. The server assigns a unique five-digit ID, which is then used with the password for subsequent logins. The nickname is unique in this prototype.
 
-## Controls in Tester Mode
+## Render and MongoDB Atlas
 
-- **WASD / arrow keys** — move
-- **Mouse** — look around; click the scene to lock the cursor
-- **Left mouse button** — fire
-- **R** — reload
-- **1 / 2** — AKR / USP
-- **Space** — jump
-- **Esc** — release the mouse cursor
-- On touch screens, use the directional pad, Fire and Reload controls; drag on the scene to look around.
+A `render.yaml` blueprint is included. Create a Web Service from this repository, then provide these environment variables in Render:
 
-All game state is local and is reset when you start a new tester run. This is an early prototype; full Teams/Allies match flow and server-backed testing permissions remain future work.
+- `MONGODB_URI`: Atlas connection string with the database name.
+- `JWT_SECRET`: a long random secret (the blueprint can generate it).
+- `ADMIN_PASSWORD`: the password for the initial `SofterX` admin account. Set this before the admin account is first created.
+- `ADMIN_NICK`: optional; defaults to `SofterX`.
+
+In Atlas, make sure the database user has the needed database permissions and the network access list permits connections from your hosting service. Never put a real database credential in a committed file or chat-visible source.
+
+## Server features
+
+- Login by five-digit player ID + password; registration by nickname + password.
+- MongoDB collections for users, chat messages, lobbies, and clans.
+- Friend list and add-by-ID; invitations to a lobby; lobby state sent through Socket.IO.
+- Only the lobby leader can change the mode, map, or team composition. The server checks this too, so a client-side button isn't the only protection.
+- Direct chat saved to MongoDB and delivered live through Socket.IO.
+- Server-side purchases and inventory for the prototype catalogue.
+- Admin panel with database health/counts, account edits (gold, password, nickname, role and owned items), tester permissions and clan moderation.
+- Role-gated tester mode and bot setup. Ordinary players cannot request the tester role through the client.
+- Passwords are bcrypt hashes; session tokens are JWTs. The MongoDB URI is never returned by the admin API.
+
+## UI and controls
+
+- Restored lobby composition: friends at the left, animated T/CT agents in the center, event cards on the right, currency and Settings/Agent buttons at the top, and bottom icons for Friends, Inventory, Market, Clans and Chat.
+- Clicking the Settings or Agent button again returns to the previous panel.
+- Mode and map selectors are in the right panel. The server enforces leader-only changes.
+- Tester mode has a local 3D shooting range with mouse look, WASD/arrow keys, jump, firing, reload, weapon selection, moving FBX bots and touch controls. The server marks Tester/Admin roles; actual multiplayer match simulation for Team Fight and Allies is not yet implemented.
+- T and CT use separate animation/model files. T uses `OTCChA_D.tga`; CT is configured for `FSB_A_D.tga`, but that texture must be uploaded into the repository root to be used. It will not be replaced with the T texture.
+- The AKR model uses `Rifles/AKR_JadeStone_D.png`; other weapon surfaces are placeholder procedural finishes until their real textures are supplied.
+
+## Run the Electron build
+
+With Node.js installed and `.env` configured, run `npm install`, then `npm start` to open the local Electron app. To build a Windows installer, run `build-exe.bat` or `npm run dist`. The app needs access to MongoDB and the remote Three.js/model assets.
