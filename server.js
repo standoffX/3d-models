@@ -325,7 +325,7 @@ io.on("connection",async socket=>{
   if(!p||!p.online||p.hp<=0)return;
   const k=data&&data.keys||{};
   p.keys={forward:!!k.forward,backward:!!k.backward,left:!!k.left,right:!!k.right,sprint:!!k.sprint};
-  p.yaw=Math.max(-Math.PI*4,Math.min(Math.PI*4,Number(data.yaw)||0));
+  const rawYaw=Number(data.yaw)||0;p.yaw=Math.atan2(Math.sin(rawYaw),Math.cos(rawYaw));
   p.pitch=Math.max(-1.3,Math.min(1.3,Number(data.pitch)||0));
   p.weapon=["USP","P350","AKR","M4"].includes(data.weapon)?data.weapon:p.weapon;
   const cap=(p.weapon==="USP"||p.weapon==="P350")?12:30;
