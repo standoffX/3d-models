@@ -30,30 +30,41 @@
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
-<body>
+<body class="auth-mode">
+<div id="authScreen" class="auth-screen">
+ <section class="auth-card">
+  <div class="auth-brand"><span class="logo-mark">X</span><span class="logo-text">STANDOFF<b>X</b></span></div>
+  <div class="auth-tabs"><button id="authLoginTab" class="active" type="button">ВХОД</button><button id="authRegisterTab" type="button">РЕГИСТРАЦИЯ</button></div>
+  <form id="loginForm" class="auth-form">
+   <label for="loginPlayerId">ИГРОВОЙ ID</label><input id="loginPlayerId" inputmode="numeric" autocomplete="username" maxlength="5" placeholder="Пять цифр" required>
+   <label for="loginPassword">ПАРОЛЬ</label><input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required>
+   <button class="auth-submit" type="submit">ВОЙТИ</button>
+  </form>
+  <form id="registerForm" class="auth-form hide">
+   <label for="registerNickname">НИКНЕЙМ</label><input id="registerNickname" autocomplete="nickname" maxlength="24" placeholder="Твой ник" required>
+   <label for="registerPassword">ПАРОЛЬ</label><input id="registerPassword" type="password" autocomplete="new-password" minlength="6" required>
+   <button class="auth-submit" type="submit">СОЗДАТЬ АККАУНТ</button>
+  </form>
+  <div class="auth-note" id="authNote">При регистрации сервер выдаст уникальный пятизначный ID.</div>
+  <div class="auth-error" id="authError" role="status"></div>
+ </section>
+</div>
 <div id="app">
 <header class="top">
-  <button class="profile-chip" id="profileButton">
-    <div class="avatar" id="topAvatar">S</div>
-    <div><b id="topName">SofterX</b><small id="topMeta">ID 100001 · УРОВЕНЬ 18</small><div class="level"><i></i></div></div>
-  </button>
   <div class="logo"><div class="logo-mark">X</div><div class="logo-text">STANDOFF<b>X</b></div></div>
   <div class="grow"></div>
-  <div class="cash"><button id="goldButton"><span class="coin">◆</span><span id="goldValue">2 450</span><span style="color:#78828b">＋</span></button><button class="optional" id="coinButton"><span class="coin" style="color:#cbd1d5">●</span><span id="coinValue">160</span><span style="color:#78828b">＋</span></button></div>
-  <button class="agent-gear" id="agentButton" title="Настройки агента"><span class="agent-gear-mark">A</span><span class="agent-gear-label">АГЕНТ</span></button><button class="gear" id="gearButton" title="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19 13.5 2 1.5-2 3.4-2.2-.8-1.6.9-.4 2.3h-4.1l-.4-2.3-1.7-.9-2.1.8-2-3.4 1.9-1.5v-2L4.5 10l2-3.4 2.1.8 1.7-.9.4-2.3h4.1l.4 2.3 1.6.9 2.2-.8 2 3.4-2 1.5z"/></svg></button>
-</header>
+  <div class="cash"><button id="goldButton" title="Золото"><span class="coin">◆</span><span id="goldValue">2 450</span><span style="color:#78828b">＋</span></button><button class="optional" id="coinButton" title="Монеты"><span class="coin" style="color:#cbd1d5">●</span><span id="coinValue">160</span><span style="color:#78828b">＋</span></button></div>
+  <button class="agent-gear" id="agentButton" title="Настройки агента"><span class="agent-gear-mark">A</span><span class="agent-gear-label">АГЕНТ</span></button>
+  <button class="gear" id="gearButton" title="Настройки" aria-label="Настройки"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="m19 13.5 2 1.5-2.2 3.4-2-.8-1.8.9-.4 2.3h-3.9l-.4-2.3-1.8-.9-2 .8-2.1-3.4 2-1.5v-2l-2-1.5 2.1-3.4 2 .8 1.8-.9.4-2.3h3.9l.4 2.3 1.8.9 2-.8 2.2 3.4-2 1.5z"/></svg></button>
+</header></header>
 <main class="layout">
   <aside class="friends" id="mainSidebar">
- <button class="sidebar-account" id="sidebarProfileButton"><div class="avatar" id="miniAvatar">S</div><div class="sidebar-account-info"><b id="sidebarName">SofterX</b><small id="sidebarMeta">ID Dev_01 · УРОВЕНЬ 18</small></div><span class="sidebar-account-arrow">↗</span></button>
- <div class="side-nav-title">МЕНЮ</div><nav class="sidebar-nav" aria-label="Основное меню">
-  <button class="side-nav-item active" data-view="home"><span class="side-nav-icon">⌂</span><span>Главная</span></button>
-  <button class="side-nav-item" data-view="inventory"><span class="side-nav-icon">▤</span><span>Инвентарь</span></button>
-  <button class="side-nav-item" data-view="market"><span class="side-nav-icon">◇</span><span>Рынок</span></button>
-  <button class="side-nav-item" data-view="clans"><span class="side-nav-icon">⚑</span><span>Кланы</span></button>
-  <button class="side-nav-item" data-view="events"><span class="side-nav-icon">✦</span><span>События</span></button>
-  <button class="side-nav-item" data-view="modes"><span class="side-nav-icon">▷</span><span>Режимы</span></button>
- </nav><div class="sidebar-bottom"><div class="sidebar-separator"></div><small>ЛОКАЛЬНЫЙ ПРОТОТИП</small><div id="partyLabel">SofterX · TESTER</div></div>
-</aside>
+ <div class="friends-head"><b>ДРУЗЬЯ</b><button id="addFriend" title="Добавить друга">＋ ПО ID</button></div>
+ <input class="search" id="friendSearch" placeholder="Поиск по нику или ID">
+ <div class="friend-tabs"><button class="active" data-filter="all">Все</button><button data-filter="online">В сети</button><button data-filter="invited">В лобби</button></div>
+ <div class="friend-list" id="friendList"><div class="no-friends">Войди в аккаунт, чтобы загрузить друзей</div></div>
+ <div class="friends-foot"><small>МОЯ КОМАНДА</small><div class="party-line"><span id="partyLabel">Лобби не создано</span><button id="openLobby">Открыть →</button></div></div>
+</aside></aside>
   <section class="stage" id="stage">
     <div class="stage-glow"></div>
     <div class="stage-status" id="stageStatus">АГЕНТЫ · ЛОББИ</div>
@@ -64,13 +75,20 @@
   <aside class="right" id="rightPanel" data-view="home"></aside>
 </main>
 
+<nav class="bottom-nav" aria-label="Разделы">
+ <button class="nav-button active" data-view="home" title="Друзья"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 14a4 4 0 0 1 3 4v2"/></svg><span>ДРУЗЬЯ</span></button>
+ <button class="nav-button" data-view="inventory" title="Инвентарь"><svg viewBox="0 0 24 24"><path d="M4 7h16v14H4zM8 7V4h8v3M4 12h16"/></svg><span>ИНВЕНТАРЬ</span></button>
+ <button class="nav-button" data-view="market" title="Рынок"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.5 12h10.8L21 8H6M10 21h.01M18 21h.01"/></svg><span>РЫНОК</span></button>
+ <button class="nav-button" data-view="clans" title="Кланы"><svg viewBox="0 0 24 24"><path d="M12 2 20 6v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6zM9 12l2 2 4-5"/></svg><span>КЛАНЫ</span></button>
+ <button class="nav-button" data-view="chat" title="Чат"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5"/></svg><span>ЧАТ</span></button>
+</nav>
 <div class="play-dock">
   <button class="mode-dock" id="modeDock"><span class="dock-icon" id="dockIcon">♜</span><span class="dock-copy"><small>ВЫБРАННЫЙ РЕЖИМ</small><b id="dockMode">СОРЕВНОВАТЕЛЬНЫЙ</b><span id="dockMap">Sandstone · Несколько карт</span></span><span class="change-mode" id="changeMode">СМЕНИТЬ РЕЖИМ</span></button>
   <button class="play-button" id="playButton">ИГРАТЬ<small>PLAY</small></button>
 </div>
 </div>
 <input id="avatarFile" type="file" class="hide" accept="image/png,image/jpeg,image/webp">
-<div id="toastHost"></div>
+<div id="toastHost"></div><div id="authToast" class="toast auth-toast hide"></div>
 <div id="testerGame" aria-label="Тестовый полигон">
  <header class="training-top"><button class="training-back" id="exitTesterGame">← В МЕНЮ</button><strong>STANDOFFX / TEST RANGE</strong><span class="game-pill" id="trainingTeam">TEAM T</span><span class="game-pill" id="trainingWeapon">USP</span></header>
  <canvas id="trainingCanvas"></canvas><div class="training-crosshair"></div><div class="training-notice" id="trainingNotice">КЛИКНИ ПО СЦЕНЕ ДЛЯ ОБЗОРА МЫШКОЙ</div>
@@ -78,6 +96,7 @@
  <div class="training-hud"><div class="training-hud-card"><small>ЗДОРОВЬЕ</small><b id="trainingHp">100</b></div><div class="training-hud-card"><small>БОТЫ</small><b id="trainingBots">0</b></div><div class="training-hud-card"><small>СЧЁТ</small><b id="trainingScore">0</b></div><div class="training-hud-card"><small>ПАТРОНЫ</small><b id="trainingAmmo">12 / ∞</b></div></div>
  <div class="training-move" id="trainingMove"><button data-move="KeyW">W</button><button data-move="KeyA">A</button><button data-move="KeyS">S</button><button data-move="KeyD">D</button></div><button class="training-reload" id="trainingReload">RELOAD</button><button class="training-fire" id="trainingFire">ОГОНЬ</button>
 </div>
+<script src="/socket.io/socket.io.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const DEMO_DATA={
